@@ -1,0 +1,12 @@
+{
+  "editor.tabSize": 2,
+  // auto format setting
+  "editor.codeActionsOnSave": ["source.organizeImports", "source.fixAll.eslint"],
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "javascript.preferences.importModuleSpecifier": "relative",
+  "typescript.preferences.importModuleSpecifier": "relative",
+  "javascript.preferences.quoteStyle": "single",
+  "typescript.preferences.quoteStyle": "single",
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.formatOnSave": true,
+}
