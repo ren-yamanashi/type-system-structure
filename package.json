@@ -1,0 +1,11 @@
+{
+  "name": "type-system-structure",
+  "version": "0.1.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "tiny-ts-parser": "^0.1.6"
+  }
+}
