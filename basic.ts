@@ -1,4 +1,4 @@
-import { parseBasic } from "tiny-ts-parser";
+import { error, parseBasic } from "tiny-ts-parser";
 
 type Type =
   | { tag: "Boolean" }
@@ -16,7 +16,7 @@ type Term =
   | { tag: "var"; name: string }
   | { tag: "func"; params: Param[]; body: Term }
   | { tag: "call"; func: Term; args: Term[] }
-  | { tag: "seq"; body: Term; rest: Term } // 逐次実行に対応
+  | { tag: "seq"; body: Term; rest: Term } // 逐次実行に対応 bodyの項を実行し、それが終わったらrestの項を実行する
   | { tag: "const"; name: string; init: Term; rest: Term };
 
 type TypeEnv = Record<string, Type>;
@@ -51,30 +51,29 @@ function typecheck(t: Term, tyEnv: TypeEnv): Type {
       return { tag: "Boolean" };
     case "if": {
       const condTy = typecheck(t.cond, tyEnv);
-      if (condTy.tag !== "Boolean") throw "boolean expected";
+      if (condTy.tag !== "Boolean") error("boolean expected", t.cond);
       const thnTy = typecheck(t.thn, tyEnv);
       const elsTy = typecheck(t.els, tyEnv);
-      if (thnTy.tag !== elsTy.tag) throw "then and else have different types";
+      if (!typeEq(thnTy, elsTy)) error("then and else have different types", t);
       return thnTy;
     }
     case "number":
       return { tag: "Number" };
     case "add": {
       const leftTy = typecheck(t.left, tyEnv);
-      if (leftTy.tag !== "Number") throw "number expected";
+      if (leftTy.tag !== "Number") error("number expected", t.left);
       const rightTy = typecheck(t.right, tyEnv);
-      if (rightTy.tag !== "Number") throw "number expected";
+      if (rightTy.tag !== "Number") error("number expected", t.right);
       return { tag: "Number" };
     }
     case "var": {
       if (tyEnv[t.name] === undefined) {
-        throw new Error(`unknown variable: ${t.name}`);
+        error(`unknown variable: ${t.name}`, t);
       }
       return tyEnv[t.name];
     }
     case "func": {
       const newTyEnv = { ...tyEnv };
-      // const newTyEnv = tyEnv;
       for (const { name, type } of t.params) {
         newTyEnv[name] = type; // params の情報を newTyEnv に追加
       }
@@ -83,22 +82,29 @@ function typecheck(t: Term, tyEnv: TypeEnv): Type {
     }
     case "call": {
       const funcTy = typecheck(t.func, tyEnv);
-      if (funcTy.tag !== "Func") throw new Error("function type expected");
+      if (funcTy.tag !== "Func") error("function type expected", t.func);
       if (funcTy.params.length !== t.args.length) {
-        throw new Error("wrong number of arguments");
+        error("wrong number of arguments", t);
       }
-      if (
-        funcTy.params.some((param, i) => {
-          const argTy = typecheck(t.args[i], tyEnv);
-          return !typeEq(argTy, param.type);
-        })
-      ) {
-        throw new Error("parameter type mismatch");
-      }
+
+      funcTy.params.forEach((param, i) => {
+        const argTy = typecheck(t.args[i], tyEnv);
+        if (!typeEq(argTy, param.type)) {
+          error("parameter type mismatch", t.args[i]);
+        }
+      });
+
       return funcTy.retType;
     }
-    default:
-      throw new Error("not implemented yet");
+    case "seq": {
+      typecheck(t.body, tyEnv);
+      return typecheck(t.rest, tyEnv);
+    }
+    case "const": {
+      const ty = typecheck(t.init, tyEnv);
+      const newTyEnv = { ...tyEnv, [t.name]: ty };
+      return typecheck(t.rest, newTyEnv);
+    }
   }
 }
 
@@ -115,3 +121,18 @@ console.dir(typecheck(parseBasic("((x: number) => x)(42)"), {}), {
 // console.dir(typecheck(parseBasic("((x: number) => x)(true)"), {}), {
 //   depth: null,
 // }); // ❌ NG
+
+console.log(
+  typecheck(
+    parseBasic(`
+  const add = (x: number, y:number) => x + y;
+  const select = (b: boolean, x:number, y:number) => b ? x : y;
+  
+  const x = add(1, add(2, 3));
+  const y = select(true, x, x);
+
+  y;
+`),
+    {}
+  )
+);
